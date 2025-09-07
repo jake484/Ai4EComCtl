@@ -1,0 +1,1652 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ai4E空压机系统仿真器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#36CFC9',
+                        warning: '#FF7D00',
+                        danger: '#F53F3F',
+                        success: '#00B42A',
+                        dark: '#1D2129',
+                        light: '#F2F3F5',
+                        suggestion: '#E8F3FF'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .card-shadow {
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            }
+            .efficiency-indicator {
+                height: 8px;
+                border-radius: 4px;
+            }
+            .scrollbar-thin {
+                scrollbar-width: thin;
+            }
+            .scrollbar-thin::-webkit-scrollbar {
+                width: 4px;
+            }
+            .scrollbar-thin::-webkit-scrollbar-thumb {
+                background-color: rgba(156, 163, 175, 0.5);
+                border-radius: 2px;
+            }
+            .parameter-lock {
+                position: relative;
+            }
+            .parameter-lock::after {
+                content: "\f023";
+                font-family: "FontAwesome";
+                position: absolute;
+                right: 8px;
+                top: 50%;
+                transform: translateY(-50%);
+                color: #9CA3AF;
+                pointer-events: none;
+            }
+            .toggle-btn {
+                transition: all 0.2s ease;
+            }
+            .toggle-btn.active {
+                background-color: #165DFF;
+                color: white;
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 font-sans text-dark min-h-screen">
+    <div class="px-3 py-4 sm:px-4 md:px-6 w-full max-w-7xl mx-auto">
+        <header class="mb-4 sm:mb-6">
+            <h1 class="text-[clamp(1.4rem,5vw,2rem)] font-bold text-primary mb-1">Ai4E空压机系统仿真器</h1>
+        </header>
+
+        <!-- 智能调节模式选择和后端连接 -->
+        <div class="bg-white rounded-lg p-3 sm:p-4 shadow-sm mb-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="flex items-center">
+                    <i class="fa fa-cogs text-primary mr-2"></i>
+                    <span class="font-medium">控制模式</span>
+                </div>
+                <div class="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 w-full sm:w-auto">
+                    <div class="inline-flex rounded-lg overflow-hidden border border-gray-200 w-full sm:w-auto">
+                        <button id="manual-mode-btn"
+                            class="toggle-btn active px-3 py-1.5 text-sm border-r border-gray-200">手动调节</button>
+                        <button id="auto-mode-btn" class="toggle-btn px-3 py-1.5 text-sm">
+                            智能调节
+                        </button>
+                    </div>
+
+                    <!-- 后端连接控制 -->
+                    <div class="flex items-center gap-2 w-full sm:w-auto">
+                        <input type="text" id="backend-url-input" value="http://127.0.0.1:8081"
+                            class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary w-full sm:w-48">
+                        <button id="connect-btn"
+                            class="px-3 py-1.5 bg-primary hover:bg-primary/90 text-white rounded-lg transition-all duration-200 text-sm">
+                            连接
+                        </button>
+                        <span id="backend-status"
+                            class="text-xs px-2 py-1.5 rounded-full bg-gray-100 text-gray-600 flex items-center whitespace-nowrap">
+                            <i class="fa fa-circle-o-notch fa-spin mr-1"></i>未连接
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <!-- 控制面板 -->
+            <div class="lg:col-span-1 space-y-4">
+                <!-- 系统控制 -->
+                <div class="bg-white rounded-lg p-3 sm:p-4 shadow-sm">
+                    <h2 class="text-base font-semibold mb-3 flex items-center">
+                        <i class="fa fa-sliders text-primary mr-2"></i>系统控制
+                    </h2>
+
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">实时用气量
+                                (m³/min)</label>
+                            <input type="number" id="air-consumption" min="0" max="200" step="1" value="60"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">系统管道体积 (m³)</label>
+                            <input type="number" id="pipe-volume" min="10" max="1000" step="10" value="200"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                            <p class="text-xs text-gray-500 mt-1">仿真开始后不可修改</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">系统压力设定值 (bar)</label>
+                            <div class="space-y-1">
+                                <input type="number" id="system-pressure-setpoint" min="5" max="12" step="0.1"
+                                    value="7.5"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                                <div class="bg-suggestion px-3 py-1.5 rounded text-xs text-primary flex items-center">
+                                    <i class="fa fa-lightbulb-o mr-1"></i>
+                                    <span>后端建议值: <span id="system-pressure-suggestion">7.5</span> bar</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-1">
+                            <button id="simulate-btn"
+                                class="w-full bg-primary hover:bg-primary/90 text-white py-2 px-4 rounded-lg transition-all duration-200 flex items-center justify-center text-sm">
+                                <i class="fa fa-play mr-2"></i>开始仿真
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 干燥机控制 -->
+                <div class="bg-white rounded-lg p-3 sm:p-4 shadow-sm">
+                    <h2 class="text-base font-semibold mb-3 flex items-center">
+                        <i class="fa fa-tint text-primary mr-2"></i>干燥机控制
+                    </h2>
+
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3 gap-3"
+                        id="dryers-container">
+                        <!-- 干燥机控制将通过JS动态生成 -->
+                    </div>
+                </div>
+
+                <!-- 空压机控制 -->
+                <div class="bg-white rounded-lg p-3 sm:p-4 shadow-sm max-h-[600px] overflow-y-auto scrollbar-thin">
+                    <h2 class="text-base font-semibold mb-3 flex items-center sticky top-0 bg-white z-10">
+                        <i class="fa fa-cogs text-primary mr-2"></i>空压机控制
+                    </h2>
+
+                    <div class="space-y-4" id="compressors-container">
+                        <!-- 空压机机控制将通过JS动态生成 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 监控面板 -->
+            <div class="lg:col-span-2 space-y-4">
+                <!-- 系统状态概览 -->
+                <div class="bg-white rounded-lg p-3 sm:p-4 shadow-sm">
+                    <h2 class="text-base font-semibold mb-3 flex items-center">
+                        <i class="fa fa-dashboard text-primary mr-2"></i>系统状态概览
+                    </h2>
+
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div class="p-3 border border-gray-100 rounded-lg bg-gradient-to-br from-blue-50 to-white">
+                            <div class="text-xs sm:text-sm text-gray-500 mb-1">系统压力</div>
+                            <div class="flex items-end">
+                                <span id="system-pressure" class="text-lg sm:text-xl font-bold text-primary">0.0</span>
+                                <span class="text-gray-500 ml-1 mb-1">bar</span>
+                            </div>
+                        </div>
+
+                        <div class="p-3 border border-gray-100 rounded-lg bg-gradient-to-br from-green-50 to-white">
+                            <div class="text-xs sm:text-sm text-gray-500 mb-1">总用气量</div>
+                            <div class="flex items-end">
+                                <span id="total-consumption"
+                                    class="text-lg sm:text-xl font-bold text-success">0.0</span>
+                                <span class="text-gray-500 ml-1 mb-1">m³/min</span>
+                            </div>
+                        </div>
+
+                        <div class="p-3 border border-gray-100 rounded-lg bg-gradient-to-br from-purple-50 to-white">
+                            <div class="text-xs sm:text-sm text-gray-500 mb-1">总供气量</div>
+                            <div class="flex items-end">
+                                <span id="total-supply" class="text-lg sm:text-xl font-bold text-purple-600">0.0</span>
+                                <span class="text-gray-500 ml-1 mb-1">m³/min</span>
+                            </div>
+                        </div>
+
+                        <div class="p-3 border border-gray-100 rounded-lg bg-gradient-to-br from-orange-50 to-white">
+                            <div class="text-xs sm:text-sm text-gray-500 mb-1">总功率</div>
+                            <div class="flex items-end">
+                                <span id="total-power" class="text-lg sm:text-xl font-bold text-warning">0.0</span>
+                                <span class="text-gray-500 ml-1 mb-1">kW</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 系统效率分析 -->
+                <div class="bg-white rounded-lg p-3 sm:p-4 shadow-sm">
+                    <h2 class="text-base font-semibold mb-3 flex items-center">
+                        <i class="fa fa-bolt text-primary mr-2"></i>系统效率分析
+                    </h2>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-sm font-medium">系统负载均衡度</span>
+                                <span id="balance-score" class="text-sm font-bold text-primary">0%</span>
+                            </div>
+                            <div class="efficiency-indicator bg-gray-200">
+                                <div id="balance-indicator" class="h-full bg-primary rounded-full" style="width: 0%">
+                                </div>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">均衡度越高越节能 (理想状态: 运行设备负载差异&lt;10%)</p>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-sm font-medium">系统能效比 (m³/kWh)</span>
+                                <span id="energy-efficiency" class="text-sm font-bold text-success">0.0</span>
+                            </div>
+                            <div class="efficiency-indicator bg-gray-200">
+                                <div id="efficiency-indicator" class="h-full bg-success rounded-full" style="width: 0%">
+                                </div>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">数值越高越节能 (每度电产生的压缩空气量)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 空压机详细数据 -->
+                <div class="bg-white rounded-lg p-3 sm:p-4 shadow-sm overflow-x-auto">
+                    <h2 class="text-base font-semibold mb-3 flex items-center">
+                        <i class="fa fa-bar-chart text-primary mr-2"></i>空压机运行数据
+                    </h2>
+
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead>
+                            <tr>
+                                <th
+                                    class="px-2 py-2 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider rounded-tl-lg">
+                                    空压机编号</th>
+                                <th
+                                    class="px-2 py-2 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    状态</th>
+                                <th
+                                    class="px-2 py-2 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    导叶开度</th>
+                                <th
+                                    class="px-2 py-2 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    排气压力</th>
+                                <th
+                                    class="px-2 py-2 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    排气量</th>
+                                <th
+                                    class="px-2 py-2 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    功率</th>
+                                <th
+                                    class="px-2 py-2 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider rounded-tr-lg">
+                                    能效比</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="compressors-data-table">
+                            <!-- 空压机数据将通过JS动态生成 -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 趋势图表 -->
+                <div class="bg-white rounded-lg p-3 sm:p-4 shadow-sm">
+                    <h2 class="text-base font-semibold mb-3 flex items-center">
+                        <i class="fa fa-line-chart text-primary mr-2"></i>系统趋势
+                    </h2>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <canvas id="pressure-chart" height="200"></canvas>
+                        </div>
+                        <div>
+                            <canvas id="flow-chart" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 带后端连接控制的空压机系统仿真器
+        class AirCompressorSystem {
+            constructor() {
+                // 后端地址配置（默认值）
+                this.backendUrl = 'http://127.0.0.1:8081';
+
+                // 设备数量配置
+                this.numCompressors = 6;
+                this.numDryers = 6;
+
+                // 控制模式：manual-手动，auto-智能调节
+                this.controlMode = 'manual';
+
+                // 存储手动设置的状态，用于模式切换时恢复
+                this.manualSettings = {
+                    compressors: [],
+                    dryers: [],
+                    systemPressureSetpoint: 7.5
+                };
+
+                // 后端建议值存储（包括压力和启停状态）
+                this.suggestedValues = {
+                    systemPressure: 7.5,
+                    compressors: [],
+                    dryers: []
+                };
+
+                // 初始化空压机参数
+                this.compressors = [];
+                for (let i = 1; i <= this.numCompressors; i++) {
+                    // 不同型号空压机
+                    let maxOutput, maxPower;
+                    if (i <= 2) {
+                        maxOutput = 30;  // 大型空压机
+                        maxPower = 185;
+                    } else if (i <= 4) {
+                        maxOutput = 20;  // 中型空压机
+                        maxPower = 132;
+                    } else {
+                        maxOutput = 15;  // 小型空压机
+                        maxPower = 90;
+                    }
+
+                    // 优化的PID参数
+                    const baseKp = 2.0;
+                    const baseKi = 0.05;
+                    const baseKd = 0.8;
+
+                    const kp = baseKp + (Math.random() * 0.3 - 0.15);
+                    const ki = baseKi + (Math.random() * 0.01 - 0.005);
+                    const kd = baseKd + (Math.random() * 0.2 - 0.1);
+
+                    // 初始化建议值（包括压力和启停状态）
+                    this.suggestedValues.compressors.push({
+                        id: i,
+                        running: false,
+                        pressureSetpoint: 7.5
+                    });
+
+                    // 初始化手动设置存储
+                    this.manualSettings.compressors.push({
+                        id: i,
+                        running: false,
+                        pressureSetpoint: 7.5
+                    });
+
+                    this.compressors.push({
+                        id: i,
+                        running: false,
+                        vaneOpening: 0,
+                        pressureSetpoint: 7.5,
+                        dischargePressure: 0,
+                        output: 0,
+                        voltage: 380,
+                        current: 0,
+                        power: 0,
+                        efficiency: 0,
+                        maxOutput: maxOutput,
+                        maxPower: maxPower,
+                        pid: {
+                            kp: kp,
+                            ki: ki,
+                            kd: kd,
+                            lastError: 0,
+                            integral: 0,
+                            maxAdjustment: 10,
+                            integralLimit: 5
+                        },
+                        efficiencyCurve: {
+                            a: -0.0012,
+                            b: 0.21,
+                            c: 1.2
+                        }
+                    });
+                }
+
+                // 初始化干燥机状态
+                this.dryers = [];
+                for (let i = 1; i <= this.numDryers; i++) {
+                    this.dryers.push({
+                        id: i,
+                        running: false
+                    });
+
+                    // 初始化建议值
+                    this.suggestedValues.dryers.push({
+                        id: i,
+                        running: false
+                    });
+
+                    // 初始化手动设置存储
+                    this.manualSettings.dryers.push({
+                        id: i,
+                        running: false
+                    });
+                }
+
+                // 系统参数
+                this.airConsumption = 60;
+                this.systemPressureSetpoint = 7.5;
+                this.systemPressure = 7.5;
+                this.pipeVolume = 200;
+                this.simulationActive = false;
+                this.simulationInterval = null;
+                this.backendConnected = false;
+
+                // 智能模式定时器
+                this.autoModeInterval = null;
+
+                // 历史数据
+                this.historyData = {
+                    pressure: Array(30).fill(7.5),
+                    consumption: Array(30).fill(60),
+                    supply: Array(30).fill(60),
+                    timestamps: Array(30).fill(new Date())
+                };
+
+                // 初始化UI
+                this.initUIElements();
+                this.initCharts();
+                this.bindEvents();
+                this.updateSystemUI();
+            }
+
+            // 初始化UI元素
+            initUIElements() {
+                // 创建干燥机控制元素
+                const dryersContainer = document.getElementById('dryers-container');
+                this.dryers.forEach(dryer => {
+                    const dryerEl = document.createElement('div');
+                    dryerEl.className = 'flex flex-col';
+                    dryerEl.innerHTML = `
+                        <div class="flex items-center justify-between p-2 border border-gray-200 rounded-lg text-sm mb-1">
+                            <span>干燥机 ${dryer.id}</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="dryer-${dryer.id}" class="dryer-toggle sr-only peer">
+                                <div class="w-10 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                            </label>
+                        </div>
+                        <div class="bg-suggestion px-2 py-1 rounded text-xs text-primary flex items-center">
+                            <i class="fa fa-lightbulb-o mr-1"></i>
+                            <span>建议: <span id="dryer-${dryer.id}-suggestion">关闭</span></span>
+                        </div>
+                    `;
+                    dryersContainer.appendChild(dryerEl);
+                });
+
+                // 创建空压机控制元素（包含启停建议）
+                const compressorsContainer = document.getElementById('compressors-container');
+                const compressorsTable = document.getElementById('compressors-data-table');
+
+                this.compressors.forEach(comp => {
+                    // 创建控制面板元素
+                    const compControlEl = document.createElement('div');
+                    compControlEl.className = 'p-3 border border-gray-200 rounded-lg';
+                    compControlEl.innerHTML = `
+                        <div class="flex items-center justify-between mb-2">
+                            <span>空压机 ${comp.id}</span>
+                            <div class="flex items-center gap-3">
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="compressor-${comp.id}" class="compressor-toggle sr-only peer">
+                                    <div class="w-10 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                                </label>
+                                <span id="comp${comp.id}-running-suggestion" class="text-xs px-1.5 py-0.5 rounded bg-suggestion text-primary">
+                                    建议: 关闭
+                                </span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 mb-2">
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">最大排气量 (m³/min)</label>
+                                <input type="number" id="comp${comp.id}-max-output" min="5" max="50" step="1" value="${comp.maxOutput}" 
+                                       class="w-full px-2 py-1 text-sm border border-gray-300 rounded-lg">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">压力设定值 (bar)</label>
+                            <input type="number" id="comp${comp.id}-pressure-set" min="5" max="12" step="0.1" value="${comp.pressureSetpoint}" 
+                                   class="w-full px-2 py-1 text-sm border border-gray-300 rounded-lg">
+                            <div class="bg-suggestion px-2 py-1 rounded text-xs text-primary flex items-center mt-1">
+                                <i class="fa fa-lightbulb-o mr-1"></i>
+                                <span>建议值: <span id="comp${comp.id}-pressure-suggestion">7.5</span> bar</span>
+                            </div>
+                        </div>
+                    `;
+                    compressorsContainer.appendChild(compControlEl);
+
+                    // 创建数据表格行
+                    const tableRow = document.createElement('tr');
+                    tableRow.id = `compressor-${comp.id}-data`;
+                    tableRow.innerHTML = `
+                        <td class="px-2 py-2 whitespace-nowrap">空压机 ${comp.id}</td>
+                        <td class="px-2 py-2 whitespace-nowrap"><span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">停止</span></td>
+                        <td class="px-2 py-2 whitespace-nowrap"><span id="comp${comp.id}-vane">0</span>%</td>
+                        <td class="px-2 py-2 whitespace-nowrap"><span id="comp${comp.id}-pressure">0</span>bar</td>
+                        <td class="px-2 py-2 whitespace-nowrap"><span id="comp${comp.id}-output">0</span>m³/min</td>
+                        <td class="px-2 py-2 whitespace-nowrap"><span id="comp${comp.id}-power">0</span>kW</td>
+                        <td class="px-2 py-2 whitespace-nowrap"><span id="comp${comp.id}-efficiency">0</span>m³/kWh</td>
+                    `;
+                    compressorsTable.appendChild(tableRow);
+                });
+            }
+
+            // 初始化图表
+            initCharts() {
+                // 压力趋势图
+                const pressureCtx = document.getElementById('pressure-chart').getContext('2d');
+                this.pressureChart = new Chart(pressureCtx, {
+                    type: 'line',
+                    data: {
+                        labels: this.historyData.timestamps.map(t => this.formatTime(t)),
+                        datasets: [{
+                            label: '系统压力 (bar)',
+                            data: this.historyData.pressure,
+                            borderColor: '#165DFF',
+                            backgroundColor: 'rgba(22, 93, 255, 0.1)',
+                            tension: 0.3,
+                            fill: true
+                        }, {
+                            label: '设定压力 (bar)',
+                            data: this.historyData.pressure.map(() => this.systemPressureSetpoint),
+                            borderColor: '#FF7D00',
+                            borderDash: [5, 5],
+                            tension: 0,
+                            fill: false,
+                            pointRadius: 0
+                        }]
+                    },
+                    options: this.getChartOptions('压力趋势')
+                });
+
+                // 流量趋势图
+                const flowCtx = document.getElementById('flow-chart').getContext('2d');
+                this.flowChart = new Chart(flowCtx, {
+                    type: 'line',
+                    data: {
+                        labels: this.historyData.timestamps.map(t => this.formatTime(t)),
+                        datasets: [{
+                            label: '用气量 (m³/min)',
+                            data: this.historyData.consumption,
+                            borderColor: '#00B42A',
+                            backgroundColor: 'rgba(0, 180, 42, 0.1)',
+                            tension: 0.3,
+                            fill: true
+                        }, {
+                            label: '供气量 (m³/min)',
+                            data: this.historyData.supply,
+                            borderColor: '#F53F3F',
+                            tension: 0.3,
+                            fill: false
+                        }]
+                    },
+                    options: this.getChartOptions('流量趋势')
+                });
+            }
+
+            // 获取图表配置
+            getChartOptions(title) {
+                return {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: title,
+                            font: {
+                                size: 14
+                            }
+                        },
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                boxWidth: 12,
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                maxRotation: 0,
+                                autoSkip: true,
+                                maxTicksLimit: 5,
+                                font: {
+                                    size: 10
+                                }
+                            },
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            beginAtZero: false,
+                            ticks: {
+                                font: {
+                                    size: 10
+                                }
+                            }
+                        }
+                    }
+                };
+            }
+
+            // 格式化时间
+            formatTime(date) {
+                return `${date.getMinutes()}:${date.getSeconds().toString().padStart(2, '0')}`;
+            }
+
+            // 绑定事件
+            bindEvents() {
+                // 控制模式切换按钮
+                document.getElementById('manual-mode-btn').addEventListener('click', () => {
+                    // 切换到手动模式前保存当前智能模式下的状态
+                    this.saveAutoModeState();
+
+                    // 停止智能模式定时器
+                    if (this.autoModeInterval) {
+                        clearInterval(this.autoModeInterval);
+                        this.autoModeInterval = null;
+                    }
+
+                    // 切换到手动模式并恢复之前的手动设置
+                    this.controlMode = 'manual';
+                    document.getElementById('manual-mode-btn').classList.add('active');
+                    document.getElementById('auto-mode-btn').classList.remove('active');
+                    this.restoreManualSettings();
+                    this.updateControlModeUI();
+                });
+
+                document.getElementById('auto-mode-btn').addEventListener('click', () => {
+                    // 切换到智能模式前保存当前手动设置
+                    this.saveManualSettings();
+
+                    // 切换到智能模式
+                    this.controlMode = 'auto';
+                    document.getElementById('auto-mode-btn').classList.add('active');
+                    document.getElementById('manual-mode-btn').classList.remove('active');
+                    this.updateControlModeUI();
+
+                    // 如果仿真正在运行且已连接后端，启动智能模式定时器
+                    if (this.simulationActive && this.backendConnected) {
+                        this.startAutoModeInterval();
+                    }
+
+                    // 切换到智能模式时立即应用建议值
+                    if (this.backendConnected) {
+                        this.applySuggestedValues();
+                    }
+                });
+
+                // 后端连接按钮
+                document.getElementById('connect-btn').addEventListener('click', () => {
+                    // 获取用户输入的后端地址
+                    const inputUrl = document.getElementById('backend-url-input').value.trim();
+                    if (inputUrl) {
+                        this.backendUrl = inputUrl;
+
+                        // 如果已经连接，先断开
+                        if (this.backendConnected) {
+                            this.disconnectFromBackend();
+                        }
+
+                        // 连接到新地址
+                        this.connectToBackend();
+                    }
+                });
+
+                // 空压机控制
+                this.compressors.forEach(comp => {
+                    document.getElementById(`compressor-${comp.id}`).addEventListener('change', (e) => {
+                        if (this.controlMode === 'manual') {
+                            // 更新运行状态
+                            comp.running = e.target.checked;
+                            if (comp.running) {
+                                comp.pid.lastError = 0;
+                                comp.pid.integral = 0;
+                                comp.vaneOpening = 30;
+                            } else {
+                                comp.vaneOpening = 0;
+                                comp.output = 0;
+                                comp.power = 0;
+                            }
+
+                            // 更新手动设置存储
+                            const manualSetting = this.manualSettings.compressors.find(s => s.id === comp.id);
+                            if (manualSetting) {
+                                manualSetting.running = comp.running;
+                            }
+
+                            // 更新UI
+                            this.updateCompressorUI(comp.id);
+                            this.updateSystemUI();
+                        }
+                    });
+
+                    // 压力设定值
+                    document.getElementById(`comp${comp.id}-pressure-set`).addEventListener('input', (e) => {
+                        if (this.controlMode === 'manual') {
+                            comp.pressureSetpoint = parseFloat(e.target.value) || 7.5;
+
+                            // 更新手动设置存储
+                            const manualSetting = this.manualSettings.compressors.find(s => s.id === comp.id);
+                            if (manualSetting) {
+                                manualSetting.pressureSetpoint = comp.pressureSetpoint;
+                            }
+                        }
+                    });
+
+                    // 最大排气量
+                    document.getElementById(`comp${comp.id}-max-output`).addEventListener('input', (e) => {
+                        if (!this.simulationActive) {
+                            const newValue = parseFloat(e.target.value) || 10;
+                            comp.maxOutput = Math.max(5, Math.min(50, newValue));
+                            comp.maxPower = Math.round(comp.maxOutput * 6.5);
+                        }
+                    });
+                });
+
+                // 干燥机控制
+                this.dryers.forEach(dryer => {
+                    document.getElementById(`dryer-${dryer.id}`).addEventListener('change', (e) => {
+                        if (this.controlMode === 'manual') {
+                            dryer.running = e.target.checked;
+
+                            // 更新手动设置存储
+                            const manualSetting = this.manualSettings.dryers.find(s => s.id === dryer.id);
+                            if (manualSetting) {
+                                manualSetting.running = dryer.running;
+                            }
+                        }
+                    });
+                });
+
+                // 系统参数
+                document.getElementById('system-pressure-setpoint').addEventListener('input', (e) => {
+                    if (this.controlMode === 'manual') {
+                        this.systemPressureSetpoint = parseFloat(e.target.value) || 7.5;
+                        this.manualSettings.systemPressureSetpoint = this.systemPressureSetpoint;
+                    }
+                });
+
+                document.getElementById('pipe-volume').addEventListener('input', (e) => {
+                    if (!this.simulationActive) {
+                        this.pipeVolume = parseFloat(e.target.value) || 100;
+                    }
+                });
+
+                document.getElementById('air-consumption').addEventListener('input', (e) => {
+                    this.airConsumption = parseFloat(e.target.value) || 0;
+                    document.getElementById('total-consumption').textContent = this.airConsumption.toFixed(1);
+                });
+
+                // 仿真控制
+                document.getElementById('simulate-btn').addEventListener('click', () => {
+                    this.toggleSimulation();
+                });
+            }
+
+            // 保存当前手动设置
+            saveManualSettings() {
+                // 保存空压机设置
+                this.compressors.forEach(comp => {
+                    const manualSetting = this.manualSettings.compressors.find(s => s.id === comp.id);
+                    if (manualSetting) {
+                        manualSetting.running = comp.running;
+                        manualSetting.pressureSetpoint = comp.pressureSetpoint;
+                    }
+                });
+
+                // 保存干燥机设置
+                this.dryers.forEach(dryer => {
+                    const manualSetting = this.manualSettings.dryers.find(s => s.id === dryer.id);
+                    if (manualSetting) {
+                        manualSetting.running = dryer.running;
+                    }
+                });
+
+                // 保存系统压力设置
+                this.manualSettings.systemPressureSetpoint = this.systemPressureSetpoint;
+
+                console.log("已保存手动设置");
+            }
+
+            // 保存当前智能模式状态（用于恢复）
+            saveAutoModeState() {
+                // 实际应用中可以根据需要保存智能模式下的状态
+                console.log("已保存智能模式状态");
+            }
+
+            // 恢复手动设置
+            restoreManualSettings() {
+                // 恢复空压机设置
+                this.manualSettings.compressors.forEach(setting => {
+                    const comp = this.compressors.find(c => c.id === setting.id);
+                    if (comp) {
+                        comp.running = setting.running;
+                        comp.pressureSetpoint = setting.pressureSetpoint;
+
+                        // 如果从关闭状态恢复，确保参数正确
+                        if (!comp.running) {
+                            comp.vaneOpening = 0;
+                            comp.output = 0;
+                            comp.power = 0;
+                        }
+
+                        // 更新UI
+                        document.getElementById(`compressor-${comp.id}`).checked = comp.running;
+                        document.getElementById(`comp${comp.id}-pressure-set`).value = comp.pressureSetpoint.toFixed(1);
+                        this.updateCompressorUI(comp.id);
+                    }
+                });
+
+                // 恢复干燥机设置
+                this.manualSettings.dryers.forEach(setting => {
+                    const dryer = this.dryers.find(d => d.id === setting.id);
+                    if (dryer) {
+                        dryer.running = setting.running;
+                        document.getElementById(`dryer-${dryer.id}`).checked = dryer.running;
+                    }
+                });
+
+                // 恢复系统压力设置
+                this.systemPressureSetpoint = this.manualSettings.systemPressureSetpoint;
+                document.getElementById('system-pressure-setpoint').value = this.systemPressureSetpoint;
+
+                // 更新系统UI
+                this.updateSystemUI();
+
+                console.log("已恢复手动设置");
+            }
+
+            // 更新控制模式UI
+            updateControlModeUI() {
+                const isAutoMode = this.controlMode === 'auto';
+
+                // 干燥机控制
+                document.querySelectorAll('.dryer-toggle').forEach(toggle => {
+                    toggle.disabled = isAutoMode;
+                    if (isAutoMode) {
+                        toggle.parentElement.classList.add('opacity-70');
+                    } else {
+                        toggle.parentElement.classList.remove('opacity-70');
+                    }
+                });
+
+                // 空压机控制
+                document.querySelectorAll('.compressor-toggle').forEach(toggle => {
+                    toggle.disabled = isAutoMode;
+                    if (isAutoMode) {
+                        toggle.parentElement.classList.add('opacity-70');
+                    } else {
+                        toggle.parentElement.classList.remove('opacity-70');
+                    }
+                });
+
+                // 压力设定值
+                this.compressors.forEach(comp => {
+                    const input = document.getElementById(`comp${comp.id}-pressure-set`);
+                    input.disabled = isAutoMode;
+                    if (isAutoMode) {
+                        input.classList.add('parameter-lock');
+                    } else {
+                        input.classList.remove('parameter-lock');
+                    }
+                });
+
+                // 系统压力设定
+                const sysPressureInput = document.getElementById('system-pressure-setpoint');
+                sysPressureInput.disabled = isAutoMode;
+                if (isAutoMode) {
+                    sysPressureInput.classList.add('parameter-lock');
+                } else {
+                    sysPressureInput.classList.remove('parameter-lock');
+                }
+            }
+
+            // 启动智能模式定时器
+            startAutoModeInterval() {
+                // 清除已存在的定时器
+                if (this.autoModeInterval) {
+                    clearInterval(this.autoModeInterval);
+                }
+
+                // 每隔1秒获取一次后端建议值
+                this.autoModeInterval = setInterval(() => {
+                    if (this.backendConnected) {
+                        this.fetchSuggestedValues();
+                    }
+                }, 1000);
+            }
+
+            // 切换仿真状态
+            toggleSimulation() {
+                if (this.simulationActive) {
+                    // 停止仿真
+                    clearInterval(this.simulationInterval);
+                    this.simulationActive = false;
+                    document.getElementById('simulate-btn').innerHTML = '<i class="fa fa-play mr-2"></i>开始仿真';
+                    document.getElementById('simulate-btn').classList.remove('bg-danger');
+                    document.getElementById('simulate-btn').classList.add('bg-primary');
+
+                    // 停止智能模式定时器
+                    if (this.autoModeInterval) {
+                        clearInterval(this.autoModeInterval);
+                        this.autoModeInterval = null;
+                    }
+
+                    // 解锁设置
+                    document.getElementById('pipe-volume').disabled = false;
+                    this.compressors.forEach(comp => {
+                        document.getElementById(`comp${comp.id}-max-output`).disabled = false;
+                    });
+                } else {
+                    // 开始仿真
+                    this.simulationActive = true;
+                    document.getElementById('simulate-btn').innerHTML = '<i class="fa fa-stop mr-2"></i>停止仿真';
+                    document.getElementById('simulate-btn').classList.remove('bg-primary');
+                    document.getElementById('simulate-btn').classList.add('bg-danger');
+
+                    // 锁定设置
+                    document.getElementById('pipe-volume').disabled = true;
+                    this.compressors.forEach(comp => {
+                        document.getElementById(`comp${comp.id}-max-output`).disabled = true;
+                    });
+
+                    // 启动仿真循环
+                    this.simulationInterval = setInterval(() => {
+                        // 定期与后端交互（每2秒一次）
+                        if (this.backendConnected && this.historyData.timestamps.length % 4 === 0) {
+                            this.sendDataToBackend();
+                        }
+                        // 更新系统参数
+                        this.updateParameters();
+                    }, 500);
+
+                    // 如果是智能模式且已连接后端，启动智能模式定时器
+                    if (this.controlMode === 'auto' && this.backendConnected) {
+                        this.startAutoModeInterval();
+                    }
+                }
+            }
+
+            // 更新系统参数
+            updateParameters() {
+                // 获取用气量
+                this.airConsumption = parseFloat(document.getElementById('air-consumption').value) || 0;
+
+                // 运行中的空压机
+                const runningCompressors = this.compressors.filter(c => c.running);
+                const activeCount = runningCompressors.length;
+
+                // 调节空压机
+                runningCompressors.forEach(compressor => {
+                    // 压力偏差
+                    const error = compressor.pressureSetpoint - this.systemPressure;
+
+                    // 死区控制
+                    if (Math.abs(error) < 0.05) {
+                        const smallAdjustment = error * 0.1;
+                        compressor.vaneOpening = Math.max(20, Math.min(100, compressor.vaneOpening + smallAdjustment));
+                        return;
+                    }
+
+                    // PID控制
+                    const pid = compressor.pid;
+                    const proportional = pid.kp * error;
+
+                    // 积分项
+                    pid.integral += pid.ki * error * 0.5;
+                    pid.integral = Math.max(-pid.integralLimit, Math.min(pid.integralLimit, pid.integral));
+
+                    // 微分项
+                    const derivative = pid.kd * (error - pid.lastError) / 0.5;
+
+                    // 总调节量
+                    let adjustment = (proportional + pid.integral + derivative) * 0.5;
+
+                    // 随机扰动
+                    adjustment *= (0.995 + Math.random() * 0.01);
+
+                    // 限制调节量
+                    const maxStep = pid.maxAdjustment * 0.5;
+                    adjustment = Math.max(-maxStep, Math.min(maxStep, adjustment));
+
+                    // 更新导叶开度
+                    let newVaneOpening = compressor.vaneOpening + adjustment;
+                    newVaneOpening = Math.max(20, Math.min(100, newVaneOpening));
+                    compressor.vaneOpening = newVaneOpening;
+
+                    // 保存误差
+                    pid.lastError = error;
+
+                    // 计算排气量
+                    compressor.output = (compressor.vaneOpening / 100) * compressor.maxOutput;
+
+                    // 排气压力
+                    compressor.dischargePressure = this.systemPressure + (compressor.output / compressor.maxOutput) * 0.5;
+
+                    // 计算功率等参数
+                    const loadRatio = compressor.vaneOpening / 100;
+                    let powerFactor = 0.65 + 0.25 * Math.sin(loadRatio * Math.PI);
+
+                    compressor.current = compressor.maxPower * 1000 / (1.732 * compressor.voltage * powerFactor) *
+                        (0.3 + 0.6 * loadRatio + 0.2 * Math.pow(loadRatio, 3));
+
+                    compressor.current *= (0.98 + Math.random() * 0.04);
+                    compressor.power = (1.732 * compressor.voltage * compressor.current * powerFactor) / 1000;
+
+                    // 能效比
+                    const curve = compressor.efficiencyCurve;
+                    let efficiency = curve.a * Math.pow(loadRatio * 100, 2) + curve.b * (loadRatio * 100) + curve.c;
+                    efficiency *= (0.95 + Math.random() * 0.1);
+                    compressor.efficiency = Math.max(0.5, efficiency);
+                });
+
+                // 总供气量
+                let totalSupply = 0;
+                this.compressors.forEach(comp => {
+                    if (comp.running) {
+                        totalSupply += comp.output;
+                    }
+                });
+
+                // 系统压力变化
+                if (activeCount > 0) {
+                    const airBalance = totalSupply - this.airConsumption;
+                    const pressureChangeRate = (airBalance / (this.pipeVolume * 120)) * this.systemPressure;
+                    this.systemPressure += pressureChangeRate * 0.8;
+                    this.systemPressure = Math.max(4, Math.min(13, this.systemPressure));
+                } else {
+                    this.systemPressure = Math.max(4, this.systemPressure - 0.015);
+                }
+
+                // 计算效率指标
+                this.calculateEfficiencyIndicators(runningCompressors, totalSupply);
+
+                // 更新UI
+                this.updateSystemUI(totalSupply);
+                runningCompressors.forEach(comp => this.updateCompressorUI(comp.id));
+
+                // 更新历史数据
+                if (this.historyData.timestamps.length % 2 === 0) {
+                    this.updateHistoryData(totalSupply);
+                }
+            }
+
+            // 计算效率指标
+            calculateEfficiencyIndicators(runningCompressors, totalSupply) {
+                const activeCount = runningCompressors.length;
+
+                if (activeCount === 0) {
+                    document.getElementById('balance-score').textContent = '0%';
+                    document.getElementById('balance-indicator').style.width = '0%';
+                    document.getElementById('energy-efficiency').textContent = '0.0';
+                    document.getElementById('efficiency-indicator').style.width = '0%';
+                    return;
+                }
+
+                // 负载均衡度
+                const avgLoad = runningCompressors.reduce((sum, comp) => sum + comp.vaneOpening, 0) / activeCount;
+                const loadDeviations = runningCompressors.map(comp => Math.abs(comp.vaneOpening - avgLoad));
+                const maxDeviation = Math.max(...loadDeviations);
+                const balanceScore = Math.max(0, 100 - (maxDeviation / 50) * 100);
+
+                document.getElementById('balance-score').textContent = `${Math.round(balanceScore)}%`;
+                document.getElementById('balance-indicator').style.width = `${balanceScore}%`;
+
+                // 均衡度颜色
+                const balanceIndicator = document.getElementById('balance-indicator');
+                if (balanceScore > 80) {
+                    balanceIndicator.className = 'h-full bg-success rounded-full';
+                } else if (balanceScore > 50) {
+                    balanceIndicator.className = 'h-full bg-primary rounded-full';
+                } else {
+                    balanceIndicator.className = 'h-full bg-warning rounded-full';
+                }
+
+                // 系统能效比
+                const totalPower = runningCompressors.reduce((sum, comp) => sum + comp.power, 0);
+                let weightedEfficiency = 0;
+
+                runningCompressors.forEach(comp => {
+                    weightedEfficiency += (comp.power / totalPower) * comp.efficiency;
+                });
+
+                document.getElementById('energy-efficiency').textContent = weightedEfficiency.toFixed(1);
+                const efficiencyPercent = Math.min(100, (weightedEfficiency / 5) * 100);
+                document.getElementById('efficiency-indicator').style.width = `${efficiencyPercent}%`;
+            }
+
+            // 更新历史数据
+            updateHistoryData(totalSupply) {
+                this.historyData.pressure.shift();
+                this.historyData.consumption.shift();
+                this.historyData.supply.shift();
+                this.historyData.timestamps.shift();
+
+                this.historyData.pressure.push(this.systemPressure);
+                this.historyData.consumption.push(this.airConsumption);
+                this.historyData.supply.push(totalSupply);
+                this.historyData.timestamps.push(new Date());
+
+                // 更新图表
+                this.pressureChart.data.labels = this.historyData.timestamps.map(t => this.formatTime(t));
+                this.pressureChart.data.datasets[0].data = this.historyData.pressure;
+                this.pressureChart.data.datasets[1].data = this.historyData.pressure.map(() => this.systemPressureSetpoint);
+                this.pressureChart.update();
+
+                this.flowChart.data.labels = this.historyData.timestamps.map(t => this.formatTime(t));
+                this.flowChart.data.datasets[0].data = this.historyData.consumption;
+                this.flowChart.data.datasets[1].data = this.historyData.supply;
+                this.flowChart.update();
+            }
+
+            // 更新系统UI
+            updateSystemUI(totalSupply = 0) {
+
+                // 确保即使没有传参也能正确计算总供气量
+                if (arguments.length === 0) {
+                    totalSupply = this.compressors
+                        .filter(c => c.running)
+                        .reduce((sum, comp) => sum + comp.output, 0);
+                }
+
+                document.getElementById('system-pressure').textContent = this.systemPressure.toFixed(1);
+                document.getElementById('total-consumption').textContent = this.airConsumption.toFixed(1);
+                document.getElementById('total-supply').textContent = totalSupply.toFixed(1);
+
+                const totalPower = this.compressors
+                    .filter(c => c.running)
+                    .reduce((sum, comp) => sum + comp.power, 0);
+                document.getElementById('total-power').textContent = totalPower.toFixed(1);
+            }
+
+            // 更新空压机UI
+            updateCompressorUI(id) {
+                const compressor = this.compressors[id - 1];
+                const statusEl = document.querySelector(`#compressor-${id}-data td:nth-child(2) span`);
+
+                if (compressor.running) {
+                    statusEl.className = 'px-2 py-1 text-xs rounded-full bg-green-100 text-green-800';
+                    statusEl.textContent = '运行中';
+
+                    document.getElementById(`comp${id}-vane`).textContent = Math.round(compressor.vaneOpening);
+                    document.getElementById(`comp${id}-pressure`).textContent = compressor.dischargePressure.toFixed(1);
+                    document.getElementById(`comp${id}-output`).textContent = compressor.output.toFixed(1);
+                    document.getElementById(`comp${id}-power`).textContent = compressor.power.toFixed(1);
+                    document.getElementById(`comp${id}-efficiency`).textContent = compressor.efficiency.toFixed(1);
+
+                    // 更新压力设定值显示
+                    document.getElementById(`comp${id}-pressure-set`).value = compressor.pressureSetpoint.toFixed(1);
+                } else {
+                    statusEl.className = 'px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800';
+                    statusEl.textContent = '停止';
+
+                    document.getElementById(`comp${id}-vane`).textContent = 0;
+                    document.getElementById(`comp${id}-pressure`).textContent = 0;
+                    document.getElementById(`comp${id}-output`).textContent = 0;
+                    document.getElementById(`comp${id}-power`).textContent = 0;
+                    document.getElementById(`comp${id}-efficiency`).textContent = 0;
+                }
+            }
+
+            // 连接后端
+            connectToBackend() {
+                // 更新状态显示
+                document.getElementById('backend-status').innerHTML =
+                    '<i class="fa fa-circle-o-notch fa-spin mr-1"></i>连接中';
+                document.getElementById('backend-status').className =
+                    'text-xs px-2 py-1.5 rounded-full bg-gray-100 text-gray-600 flex items-center whitespace-nowrap';
+
+                console.log(`正在连接到后端: ${this.backendUrl}`);
+
+                // 实际API调用 - 发送GET请求检查连接
+                fetch(`${this.backendUrl}/hello`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    timeout: 5000
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! Status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        // 检查后端返回的消息
+                        if (data && data.code === 200) {
+                            this.backendConnected = true;
+                            document.getElementById('backend-status').innerHTML =
+                                '<i class="fa fa-check-circle mr-1"></i>已连接';
+                            document.getElementById('backend-status').className =
+                                'text-xs px-2 py-1.5 rounded-full bg-green-100 text-green-600 flex items-center whitespace-nowrap';
+
+                            console.log('后端连接成功:', data.message);
+
+                            // 连接成功后立即获取一次建议值
+                            this.fetchSuggestedValues();
+
+                            // 如果是智能模式且仿真正在运行，启动智能模式定时器
+                            if (this.controlMode === 'auto' && this.simulationActive) {
+                                this.startAutoModeInterval();
+                            }
+                        } else {
+                            throw new Error('后端返回非成功状态');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('后端连接失败:', error);
+                        this.handleBackendError();
+                    });
+            }
+            // 断开后端连接
+            disconnectFromBackend() {
+                this.backendConnected = false;
+                document.getElementById('backend-status').innerHTML =
+                    '<i class="fa fa-circle-o-notch fa-spin mr-1"></i>断开连接中';
+                document.getElementById('backend-status').className =
+                    'text-xs px-2 py-1.5 rounded-full bg-gray-100 text-gray-600 flex items-center whitespace-nowrap';
+
+                // 停止智能模式定时器
+                if (this.autoModeInterval) {
+                    clearInterval(this.autoModeInterval);
+                    this.autoModeInterval = null;
+                }
+
+                console.log(`正在断开与后端 ${this.backendUrl} 的连接`);
+
+                // 实际断开连接的API调用（已注释）
+                /*
+                fetch(`${this.backendUrl}/api/disconnect`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('后端断开连接:', data.message);
+                    this.backendConnected = false;
+                    document.getElementById('backend-status').innerHTML = 
+                        '<i class="fa fa-times-circle mr-1"></i>未连接';
+                    document.getElementById('backend-status').className = 
+                        'text-xs px-2 py-1.5 rounded-full bg-gray-100 text-gray-600 flex items-center whitespace-nowrap';
+                })
+                .catch(error => {
+                    console.error('断开连接时出错:', error);
+                    this.backendConnected = false;
+                    document.getElementById('backend-status').innerHTML = 
+                        '<i class="fa fa-times-circle mr-1"></i>未连接';
+                    document.getElementById('backend-status').className = 
+                        'text-xs px-2 py-1.5 rounded-full bg-gray-100 text-gray-600 flex items-center whitespace-nowrap';
+                });
+                */
+
+                // 模拟断开连接（实际使用时请注释此部分）
+                setTimeout(() => {
+                    console.log(`已断开与后端 ${this.backendUrl} 的连接（模拟）`);
+                    document.getElementById('backend-status').innerHTML =
+                        '<i class="fa fa-times-circle mr-1"></i>未连接';
+                    document.getElementById('backend-status').className =
+                        'text-xs px-2 py-1.5 rounded-full bg-gray-100 text-gray-600 flex items-center whitespace-nowrap';
+                }, 500);
+            }
+
+            // 发送数据到后端
+            sendDataToBackend() {
+                if (!this.backendConnected) return;
+
+                // 收集需要发送给后端的数据
+                const dataToSend = {
+                    timestamp: new Date().toISOString(),
+                    systemPressure: this.systemPressure,
+                    systemPressureSetpoint: this.systemPressureSetpoint,
+                    airConsumption: this.airConsumption,
+                    pipeVolume: this.pipeVolume,
+                    compressors: this.compressors.map(comp => ({
+                        id: comp.id,
+                        running: comp.running,
+                        vaneOpening: comp.vaneOpening,
+                        pressureSetpoint: comp.pressureSetpoint,
+                        output: comp.output,
+                        power: comp.power,
+                        efficiency: comp.efficiency,
+                        maxOutput: comp.maxOutput,
+                        dischargePressure: comp.dischargePressure
+                    })),
+                    dryers: this.dryers.map(dryer => ({
+                        id: dryer.id,
+                        running: dryer.running
+                    }))
+                };
+
+                // 实际API调用 - 发送数据到后端
+                fetch(`${this.backendUrl}/optimize`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(dataToSend)
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! Status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('数据发送成功:', data.message);
+                        // 如果后端返回了优化建议，则应用这些建议
+                        if (data.code === 200 && data.data) {
+                            this.updateSuggestedValuesFromBackend(data.data);
+                            this.displaySuggestedValues();
+
+                            // 如果是智能模式，应用建议值
+                            if (this.controlMode === 'auto') {
+                                this.applySuggestedValues();
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('发送数据失败:', error);
+                        this.handleBackendError();
+                    });
+            }
+            // 从后端获取建议值
+            fetchSuggestedValues() {
+                if (!this.backendConnected) return;
+
+                console.log(`从后端 ${this.backendUrl} 获取建议值`);
+
+                // 构造模拟数据发送到优化接口
+                const mockData = {
+                    timestamp: new Date().toISOString(),
+                    systemPressure: this.systemPressure,
+                    systemPressureSetpoint: this.systemPressureSetpoint,
+                    airConsumption: this.airConsumption,
+                    pipeVolume: this.pipeVolume,
+                    compressors: this.compressors.map(comp => ({
+                        id: comp.id,
+                        running: comp.running,
+                        vaneOpening: comp.vaneOpening,
+                        pressureSetpoint: comp.pressureSetpoint,
+                        output: comp.output,
+                        power: comp.power,
+                        efficiency: comp.efficiency,
+                        maxOutput: comp.maxOutput,
+                        dischargePressure: comp.dischargePressure
+                    })),
+                    dryers: this.dryers.map(dryer => ({
+                        id: dryer.id,
+                        running: dryer.running
+                    }))
+                };
+
+                // 发送到优化接口获取建议
+                fetch(`${this.backendUrl}/optimize`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(mockData)
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! Status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('获取建议值成功:', data);
+                        if (data.code === 200 && data.data) {
+                            this.updateSuggestedValuesFromBackend(data.data);
+                            this.displaySuggestedValues();
+
+                            // 如果是智能模式，应用建议值
+                            if (this.controlMode === 'auto') {
+                                this.applySuggestedValues();
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('获取建议值失败:', error);
+                        this.handleBackendError();
+                    });
+            }
+            // 生成后端数据结构模拟（您可以根据此结构编写实际后端返回数据）
+            generateBackendDataStructure() {
+                // 计算所需总气量
+                const requiredAir = this.airConsumption * 1.1; // 增加10%余量
+                let totalCapacity = 0;
+
+                // 按效率和容量排序空压机
+                const sortedCompressors = [...this.compressors].sort((a, b) => {
+                    // 优先选择大型高效率空压机
+                    return (b.maxOutput * 0.7 + b.efficiency * 0.3) - (a.maxOutput * 0.7 + a.efficiency * 0.3);
+                });
+
+                // 后端返回的数据结构
+                const backendData = {
+                    // 系统级建议
+                    system: {
+                        pressureSetpoint: parseFloat((this.systemPressureSetpoint + (Math.random() * 0.6 - 0.3)).toFixed(1)),
+                        timestamp: new Date().toISOString(),
+                        message: "Optimal settings calculated based on current load"
+                    },
+
+                    // 空压机建议数组
+                    compressors: [],
+
+                    // 干燥机建议数组
+                    dryers: []
+                };
+
+                // 为每个空压机生成建议值
+                sortedCompressors.forEach((comp) => {
+                    let shouldRun = false;
+
+                    // 决定是否建议运行（基于所需气量）
+                    if (totalCapacity < requiredAir) {
+                        shouldRun = true;
+                        totalCapacity += comp.maxOutput;
+                    } else {
+                        // 气量足够，15%概率作为备用开启
+                        shouldRun = Math.random() < 0.15;
+                    }
+
+                    // 基于当前压力和负载生成建议压力值
+                    let basePressure = comp.pressureSetpoint;
+                    const loadFactor = comp.running ? comp.vaneOpening / 100 : 0;
+
+                    // 负载低的空压机提高压力，负载高的降低压力
+                    const adjustment = (0.5 - loadFactor) * 0.6;
+
+                    // 添加随机因素
+                    const randomAdjustment = (Math.random() * 0.4 - 0.2);
+
+                    let suggestedPressure = basePressure + adjustment + randomAdjustment;
+                    suggestedPressure = Math.max(6, Math.min(9, suggestedPressure));
+
+                    // 添加到后端数据结构
+                    backendData.compressors.push({
+                        id: comp.id,
+                        running: shouldRun,
+                        pressureSetpoint: parseFloat(suggestedPressure.toFixed(1)),
+                        // 可以添加更多后端计算的参数
+                        efficiencyScore: parseFloat((Math.random() * 30 + 70).toFixed(1)), // 效率评分
+                        priority: sortedCompressors.indexOf(comp) + 1 // 运行优先级
+                    });
+                });
+
+                // 干燥机建议值（基于用气量）
+                const requiredDryers = Math.max(1, Math.min(this.numDryers, Math.ceil(this.airConsumption / 30)));
+                this.dryers.forEach((dryer, index) => {
+                    // 随机选择足够数量的干燥机运行
+                    const shouldRun = index < requiredDryers
+                        ? (Math.random() > 0.2)  // 80%概率运行
+                        : (Math.random() < 0.1); // 10%概率运行
+
+                    backendData.dryers.push({
+                        id: dryer.id,
+                        running: shouldRun
+                    });
+                });
+
+                console.log("后端数据结构:", backendData);
+                return backendData;
+            }
+
+            // 从后端数据结构更新建议值
+            updateSuggestedValuesFromBackend(backendData) {
+                // 更新系统级建议
+                if (backendData.system && backendData.system.pressureSetpoint) {
+                    this.suggestedValues.systemPressure = backendData.system.pressureSetpoint;
+                }
+
+                // 更新空压机建议
+                if (backendData.compressors) {
+                    backendData.compressors.forEach(backendComp => {
+                        const suggestion = this.suggestedValues.compressors.find(s => s.id === backendComp.id);
+                        if (suggestion) {
+                            suggestion.running = backendComp.running || false;
+                            suggestion.pressureSetpoint = backendComp.pressureSetpoint || 7.5;
+                        }
+                    });
+                }
+
+                // 更新干燥机建议
+                if (backendData.dryers) {
+                    backendData.dryers.forEach(backendDryer => {
+                        const suggestion = this.suggestedValues.dryers.find(s => s.id === backendDryer.id);
+                        if (suggestion) {
+                            suggestion.running = backendDryer.running || false;
+                        }
+                    });
+                }
+            }
+            // 显示建议值（包括压力和启停状态）
+            displaySuggestedValues() {
+                // 系统压力建议值
+                document.getElementById('system-pressure-suggestion').textContent =
+                    this.suggestedValues.systemPressure;
+
+                // 空压机建议值（包括启停和压力）
+                this.suggestedValues.compressors.forEach(suggestion => {
+                    // 显示启停建议
+                    const runningText = suggestion.running ? '开启' : '关闭';
+                    const runningClass = suggestion.running
+                        ? 'bg-green-100 text-green-600'
+                        : 'bg-suggestion text-primary';
+
+                    document.getElementById(`comp${suggestion.id}-running-suggestion`).textContent =
+                        `建议: ${runningText}`;
+                    document.getElementById(`comp${suggestion.id}-running-suggestion`).className =
+                        `text-xs px-1.5 py-0.5 rounded ${runningClass}`;
+
+                    // 显示压力建议
+                    document.getElementById(`comp${suggestion.id}-pressure-suggestion`).textContent =
+                        suggestion.pressureSetpoint;
+                });
+
+                // 干燥机建议值
+                this.suggestedValues.dryers.forEach(suggestion => {
+                    document.getElementById(`dryer-${suggestion.id}-suggestion`).textContent =
+                        suggestion.running ? '开启' : '关闭';
+                });
+            }
+
+            // 应用建议值
+            applySuggestedValues() {
+                if (!this.backendConnected) return;
+
+                // 应用系统压力建议值
+                this.systemPressureSetpoint = this.suggestedValues.systemPressure;
+                document.getElementById('system-pressure-setpoint').value = this.systemPressureSetpoint;
+
+                // 应用空压机建议值（包括启停和压力）
+                this.suggestedValues.compressors.forEach(suggestion => {
+                    const comp = this.compressors.find(c => c.id === suggestion.id);
+                    if (comp) {
+                        // 应用启停状态
+                        if (comp.running !== suggestion.running) {
+                            comp.running = suggestion.running;
+                            if (comp.running) {
+                                comp.pid.lastError = 0;
+                                comp.pid.integral = 0;
+                                comp.vaneOpening = 30;
+                            } else {
+                                comp.vaneOpening = 0;
+                                comp.output = 0;
+                                comp.power = 0;
+                            }
+                        }
+
+                        // 应用压力设定值
+                        comp.pressureSetpoint = suggestion.pressureSetpoint;
+                        document.getElementById(`comp${suggestion.id}-pressure-set`).value = suggestion.pressureSetpoint;
+
+                        // 更新UI
+                        this.updateCompressorUI(comp.id);
+                    }
+                });
+
+                // 应用干燥机建议值
+                this.suggestedValues.dryers.forEach(suggestion => {
+                    const dryer = this.dryers.find(d => d.id === suggestion.id);
+                    if (dryer) {
+                        dryer.running = suggestion.running;
+                        document.getElementById(`dryer-${suggestion.id}`).checked = suggestion.running;
+                    }
+                });
+
+                // 更新系统UI
+                this.updateSystemUI();
+            }
+
+            // 处理后端连接错误
+            handleBackendError() {
+                this.backendConnected = false;
+                document.getElementById('backend-status').innerHTML =
+                    '<i class="fa fa-exclamation-triangle mr-1"></i>连接错误';
+                document.getElementById('backend-status').className =
+                    'text-xs px-2 py-1.5 rounded-full bg-red-100 text-red-600 flex items-center whitespace-nowrap';
+
+                // 停止智能模式定时器
+                if (this.autoModeInterval) {
+                    clearInterval(this.autoModeInterval);
+                    this.autoModeInterval = null;
+                }
+
+                console.log('后端连接错误，将在5秒后尝试重新连接');
+
+                // 尝试重新连接
+                setTimeout(() => {
+                    this.connectToBackend();
+                }, 5000);
+            }
+        }
+
+        // 初始化系统
+        document.addEventListener('DOMContentLoaded', () => {
+            const system = new AirCompressorSystem();
+        });
+    </script>
+</body>
+
+</html>

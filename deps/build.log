@@ -1,0 +1,11 @@
+[ Info: 构建过程日志将记录到 build.log
+ERROR: LoadError: UndefVarError: `@success` not defined in `Main`
+Stacktrace:
+ [1] top-level scope
+   @ :0
+ [2] include(fname::String)
+   @ Main .\sysimg.jl:38
+ [3] top-level scope
+   @ none:5
+in expression starting at D:\develop\空压\Ai4EComCtl\deps\build.jl:9
+in expression starting at D:\develop\空压\Ai4EComCtl\deps\build.jl:6
