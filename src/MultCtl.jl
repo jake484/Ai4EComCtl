@@ -20,7 +20,8 @@ function calculate_pressure_trend(sys::AirCompressorSystem)::Tuple{Float64, Floa
     # 取最近两个时间点的压力计算变化率
     (t1, p1) = sys.pressure_history[end-1]
     (t2, p2) = sys.pressure_history[end]
-    dt = Second(t2 - t1).value  # 时间差（秒）
+    @info "压力变化率计算: $(t1) ~ $(t2)"
+    dt = second(t2) - second(t1)
     dp = p2 - p1                # 压力差（Bar）
     
     return dt > 0 ? (p2, dp / dt) : (p2, 0.0)
@@ -388,33 +389,62 @@ function compressor_interlock_logic(sys::AirCompressorSystem)
 end
 
 """
-启动压缩机联锁逻辑的定时任务
-返回值：任务句柄，可用于后续终止任务
+基于当前系统状态生成优化建议
 """
-function start_compressor_interlock_task(sys::AirCompressorSystem, interval_seconds::Float64=1.0)::Task
-    @info "启动压缩机联锁逻辑定时任务，间隔: $(interval_seconds)秒"
+function generate_system_optimization_suggestion(sys::AirCompressorSystem)::Dict{String, Any}
+    # 获取当前压力状态
+    current_p = sys.main_pressure
+    running_compressors = [c for c in sys.compressors if c.state == RUNNING]
+    running_count = length(running_compressors)
     
-    task = @async begin
-        while true
-            try
-                compressor_interlock_logic(sys)
-            catch e
-                @error "联锁逻辑执行出错" exception=e
-                push!(sys.alarms, (now(), "联锁逻辑执行出错: $(sprint(showerror, e))"))
-            end
-            sleep(interval_seconds)
-        end
+    # 确定建议的运行压缩机数量
+    suggested_running_count = running_count
+    
+    if current_p < sys.params.p_low
+        # 压力过低，需要增加运行的压缩机
+        suggested_running_count = min(length(sys.compressors), running_count + 1)
+    elseif current_p > sys.params.p_high
+        # 压力过高，可以减少运行的压缩机
+        suggested_running_count = max(1, running_count - 1)
     end
     
-    return task
+    # 生成压缩机建议
+    suggested_compressors = []
+    sorted_compressors = sort(sys.compressors, by=c -> c.id)
+    
+    for (i, comp) in enumerate(sorted_compressors)
+        target_running = i <= suggested_running_count
+        target_pressure = sys.params.p_set + (rand() - 0.5) * 0.2
+        
+        push!(suggested_compressors, Dict(
+            "id" => comp.id,
+            "running" => target_running,
+            "pressureSetpoint" => round(target_pressure, digits=1)
+        ))
+    end
+    
+    # 生成干燥机建议（基于压缩机运行数量）
+    suggested_dryers = []
+    required_dryers = max(1, ceil(Int, suggested_running_count / 2))
+    
+    for (i, dryer) in enumerate(sys.dryers)
+        target_running = i <= required_dryers
+        push!(suggested_dryers, Dict(
+            "id" => dryer.id,
+            "running" => target_running
+        ))
+    end
+    
+    # 系统压力设定建议
+    system_pressure_suggestion = sys.params.p_set + (rand() - 0.5) * 0.1
+    
+    return Dict(
+        "system" => Dict(
+            "pressureSetpoint" => round(system_pressure_suggestion, digits=1),
+            "message" => "Optimal settings based on current system state"
+        ),
+        "compressors" => suggested_compressors,
+        "dryers" => suggested_dryers
+    )
 end
 
-"""
-停止定时任务
-"""
-function stop_compressor_interlock_task(task::Task)
-    if istaskrunning(task)
-        Base.throwto(task, InterruptException())
-        @info "压缩机联锁逻辑定时任务已停止"
-    end
-end
