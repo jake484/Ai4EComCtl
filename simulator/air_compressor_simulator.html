@@ -139,7 +139,7 @@
                         </div>
 
                         <div>
-                            <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">系统压力设定值 (bar)</label>
+                            <label class="block text-xs sm:text-sm font-medium text-gray-700 mb-1">系统压力需求值 (bar)</label>
                             <div class="space-y-1">
                                 <input type="number" id="system-pressure-setpoint" min="5" max="12" step="0.1"
                                     value="7.5"
@@ -363,9 +363,9 @@
                     }
 
                     // 优化的PID参数
-                    const baseKp = 2.0;
-                    const baseKi = 0.05;
-                    const baseKd = 0.8;
+                    const baseKp = 20.0;
+                    const baseKi = 5.0;
+                    const baseKd = 1.0;
 
                     const kp = baseKp + (Math.random() * 0.3 - 0.15);
                     const ki = baseKi + (Math.random() * 0.01 - 0.005);
@@ -776,8 +776,8 @@
 
                 // 系统参数
                 document.getElementById('system-pressure-setpoint').addEventListener('input', (e) => {
+                    this.systemPressureSetpoint = parseFloat(e.target.value) || 7.5;
                     if (this.controlMode === 'manual') {
-                        this.systemPressureSetpoint = parseFloat(e.target.value) || 7.5;
                         this.manualSettings.systemPressureSetpoint = this.systemPressureSetpoint;
                     }
                 });
@@ -1576,9 +1576,11 @@
                 if (!this.backendConnected) return;
 
                 // 应用系统压力建议值
-                this.systemPressureSetpoint = this.suggestedValues.systemPressure;
-                document.getElementById('system-pressure-setpoint').value = this.systemPressureSetpoint;
-
+                // this.systemPressureSetpoint = this.suggestedValues.systemPressure;
+                // document.getElementById('system-pressure-setpoint').value = this.systemPressureSetpoint;
+                // 仅显示建议值供用户参考
+                document.getElementById('system-pressure-suggestion').textContent =
+                    this.suggestedValues.systemPressure;
                 // 应用空压机建议值（包括启停和压力）
                 this.suggestedValues.compressors.forEach(suggestion => {
                     const comp = this.compressors.find(c => c.id === suggestion.id);

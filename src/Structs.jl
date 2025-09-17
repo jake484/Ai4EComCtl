@@ -36,6 +36,7 @@ Base.@kwdef mutable struct SystemParams
     ultra_high_delay::Float64 = 2.0         # 超高压保护延时
 end
 
+
 Base.@kwdef mutable struct Compressor
     id::Int                       # 设备ID
     mode::ControlMode = REMOTE_CONTROL    # 控制模式
@@ -45,8 +46,8 @@ Base.@kwdef mutable struct Compressor
     load_time::Float64 = 0.0            # 累计加载时间（秒）
     outlet_pressure::Float64 = 0.0      # 出口压力（Bar）
     fault_code::Union{Int,Nothing} = nothing  # 故障码（无故障为Nothing）
+    target_pressure::Float64 = 0.0      # 目标压力设定值（Bar）
 end
-
 Base.@kwdef mutable struct Dryer
     id::Int                       # 设备ID（1~4）
     mode::ControlMode = REMOTE_CONTROL    # 控制模式
@@ -58,9 +59,14 @@ end
 
 Base.@kwdef mutable struct AirCompressorSystem
     mode::SystemMode = AUTO_INTERLOCK              # 系统控制模式
-    params::SystemParams = SystemParams()          # 系统参数配置
     compressors::Vector{Compressor} = Compressor[] # 压缩机列表
     dryers::Vector{Dryer} = Dryer[]               # 干燥机列表
+    params::SystemParams = SystemParams(
+        comp_priority=collect(1:length(compressors)),
+        dryer_priority=collect(1:length(dryers)),
+        comp_interlock=trues(length(compressors)),
+        dryer_interlock=trues(length(dryers))
+    )          # 系统参数配置
     main_pressure::Float64 = 0.0                  # 总管压力（Bar）
     pressure_history::Vector{Tuple{DateTime,Float64}} = Tuple{DateTime,Float64}[] # 压力历史（时间+值）
     # 标志位
