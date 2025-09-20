@@ -69,6 +69,14 @@ function CorsMiddleware(handler)
 end
 
 function julia_main(async=true)
+    # 在 julia_main() 函数中添加以下代码块
+    @get "/" function (req)
+        # 指定HTML文件路径
+        html_file_path = joinpath(@__DIR__, "simulator", "air_compressor_simulator.html")
+        # 读取HTML文件内容
+        return file(html_file_path)
+    end
+
     # 处理 /hello 端点
     @get "/hello" function (req)
         response = Dict(
