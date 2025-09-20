@@ -9,9 +9,10 @@ COPY . .
 
 # 安装 Julia 依赖包
 RUN julia -e 'using Pkg; Pkg.instantiate()'
+RUN julia main.jl
 
 # 暴露端口 8081
 EXPOSE 8081
 
 # 启动命令
-CMD ["julia", "--project=@.", "main.jl"]
+CMD ["julia", "--project=@.", "main.jl", "true"]

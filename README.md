@@ -101,3 +101,11 @@ julia> julia_main()
 3. 前后端需要网络连通才能实现完整功能
 4. 首次运行后端可能需要较长时间进行预编译
 5. 如需修改监听端口，可在 [server.jl](file://d:\develop\空压\Ai4EComCtl\server.jl) 文件中调整
+
+## Docker启动
+
+### 启动
+```
+# 运行容器
+docker run -p 8081:8081 air-compressor-simulator
+```
