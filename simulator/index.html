@@ -694,7 +694,9 @@
                 // 后端连接按钮
                 document.getElementById('connect-btn').addEventListener('click', () => {
                     // 获取用户输入的后端地址
-                    const inputUrl = document.getElementById('backend-url-input').value.trim();
+                    let inputUrl = document.getElementById('backend-url-input').value.trim();
+                    inputUrl = inputUrl.replace(/\/$/, '');
+
                     if (inputUrl) {
                         this.backendUrl = inputUrl;
 
@@ -1206,6 +1208,7 @@
 
             // 连接后端
             connectToBackend() {
+                this.backendUrl = this.backendUrl.replace(/\/$/, '');
                 // 更新状态显示
                 document.getElementById('backend-status').innerHTML =
                     '<i class="fa fa-circle-o-notch fa-spin mr-1"></i>连接中';

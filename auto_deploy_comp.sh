@@ -33,3 +33,7 @@ docker run -d --name $CONTAINER_NAME \
   -p 8081:8081 \
   --restart=always \
   $IMAGE_NAME
+
+sleep 5
+
+docker container logs air_compressor_simulator
